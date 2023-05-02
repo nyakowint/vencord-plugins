@@ -15,6 +15,6 @@ export default definePlugin({
     },
 
     activate() {
-        console.log('you're gullible');
+        console.log("you're gullible");
     }
 });
