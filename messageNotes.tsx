@@ -2,9 +2,9 @@
 
 import { Devs } from "@utils/constants";
 import definePlugin from "@utils/types";
-import Logger from "@utils/Logger";
-import { Button, ChannelStore, MessageStore, NavigationRouter, Text, Tooltip, UserStore } from "@webpack/common";
-import { find, findByCodeLazy, findByPropsLazy } from "@webpack";
+import { Logger } from "@utils/Logger";
+import { Button, ChannelStore, Text, Tooltip } from "@webpack/common";
+import { find, findByCodeLazy } from "@webpack";
 import { addServerListElement, removeServerListElement, ServerListRenderPosition } from "@api/ServerList";
 import {
     closeModal, ModalCloseButton,
@@ -13,18 +13,17 @@ import {
     ModalSize, openModal
 } from "@utils/modal";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { LazyComponent } from "@utils/misc";
+import { LazyComponent } from "@utils/react";
 import { addButton, removeButton } from "@api/MessagePopover";
 import { DataStore } from "@api/index";
 import { MessageAttachment } from "discord-types/general";
+import { Moment } from "moment";
 
 
 const STORE_PREFIX = "MessageNotes_List";
 
 const ChannelMessage = LazyComponent(() => find(m => m.type?.toString()?.includes('["message","compact","className",')));
-const MessageObject = findByCodeLazy('FocusRing was given a focusTarget');
-const Channel = findByPropsLazy('getChannelId', 'getGuildId');
-
+const createBotMessage = findByCodeLazy('username:"Clyde"');
 
 interface SavedNote {
     id: string;
@@ -37,10 +36,58 @@ interface SavedNote {
     author: string;
 }
 
+interface iUser {
+    avatar: string;
+    discriminator: string;
+    id: string;
+    username: string;
+    display_name?: string;
+    avatarDecoration?: string;
+}
 
-// we do a little intrayoinking
-const getNotes = () => DataStore.get(STORE_PREFIX).then<SavedNote[]>(t => t ?? []);
-const addNote = async (n: SavedNote) => {
+interface iMessage {
+    channel_id?: string;
+    guild_id?: string;
+    author: iUser;
+    content: string;
+    id: string;
+    type: number;
+    timestamp: string | Moment;
+    referenced_message?: iMessage;
+    tts: boolean;
+    components?: any;
+    attachments: any[];
+    embeds: any[];
+    member?: {
+        avatar?: string;
+        roles: string[];
+        joined_at: string;
+        premium_since?: string;
+        nick?: string;
+        deaf: boolean;
+        mute: boolean;
+        flags: number;
+    };
+    mentions: string[];
+}
+
+function fakeMessage(message: iMessage) {
+    // we have to camelCase channelId because discord™.
+    const msg = createBotMessage({
+        channelId: message.channel_id,
+        content: message.content,
+        guildId: message.guild_id,
+        author: message.author
+    });
+    // the above message now has the functions hasFlag() and stuff,
+    // which makes it valid for the component 👍.
+    msg.id = message.id;
+    msg.flags = 0;
+    return msg;
+}
+
+const getNotes = () => DataStore.get(STORE_PREFIX).then<any[]>(t => t ?? []);
+const addNote = async (n: any) => {
     const notes = await getNotes();
     notes.push(n);
     DataStore.set(STORE_PREFIX, notes);
@@ -52,6 +99,8 @@ const removeNote = async (id: string) => {
     DataStore.set(STORE_PREFIX, notes);
     return notes;
 };
+
+//balls
 
 function NotebookIcon() {
     return (
@@ -98,28 +147,27 @@ async function openNotesModal() {
                     <ModalCloseButton onClick={() => closeModal(key)} />
                 </ModalHeader>
                 <ModalContent>
-                    {notes.map((n: SavedNote) => (
+                    {notes.map((n: any) => (
                         <div>
                             <ChannelMessage
                                 id={`message-notes-${n.id}`}
-                                message={MessageStore.getMessage(n.meta.channelId, n.id)
-                                    /*new MessageObject(
-                                    Object.assign({}, {
-                                        id: n.id,
-                                        content: n.content,
-                                        attachments: n.attachments,
-                                        author: UserStore.getUser(n.author), // whatever yet again
-                                    })
-                                )*/
+                                message={/*MessageStore.getMessage(n.channel_id, n.id)*/
+                                    fakeMessage(n)
                                 }
                                 channel={
-                                    ChannelStore.getChannel(n.meta.channelId)
-                                    /*new Channel({ id: "message-notes-vc" })*/
+                                    { ...ChannelStore.getChannel(n.channelId), isFirstMessageInForumPost: () => { } }
+                                    /* new Channel({ id: "message-notes-vc" }) */
                                 }
+                                key={n.id}
+                                groupId={n.id}
+                                compact={false}
+                                isHighlight={false}
+                                isLastItem={false}
+                                renderContentOnly={false}
                                 subscribeToComponentDispatch={false}
                             />
                             <Button onClick={
-                                () => { NavigationRouter.transitionTo(`/channels/${n.meta.guildId}/${n.meta.channelId}/${n.id}`); }
+                                () => { /* NavigationRouter.transitionTo(`/channels/${n.meta.guildId}/${n.meta.channelId}/${n.id}`); */ }
                             }>Jump to message</Button>
                         </div>
                     ))};
@@ -136,7 +184,7 @@ export default definePlugin({
     name: "MessageNotes",
     description: "Save messages to a notebook for easy access",
     authors: [Devs.Animal],
-    dependencies: ["MenuItemDeobfuscatorAPI", "MessagePopoverAPI", "ServerListAPI"],
+    dependencies: ["MessagePopoverAPI", "ServerListAPI"],
 
     start() {
         addServerListElement(ServerListRenderPosition.Above, this.renderNotesButton);
@@ -148,7 +196,7 @@ export default definePlugin({
                 message: msg,
                 channel: channel,
                 onClick: () => {
-                    const newNote: SavedNote = {
+                    /* const newNote: SavedNote = {
                         id: msg.id,
                         author: msg.author.id,
                         content: msg.content,
@@ -157,8 +205,8 @@ export default definePlugin({
                             channelId: channel.id,
                         },
                         attachments: msg.attachments,
-                    };
-                    addNote(newNote);
+                    }; */
+                    addNote(fakeMessage(msg));
                 }
             };
         });
@@ -171,3 +219,4 @@ export default definePlugin({
 
     renderNotesButton: () => <NotesButton />,
 });
+
