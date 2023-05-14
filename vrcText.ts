@@ -66,7 +66,6 @@ const plugin = definePlugin({
             }
         };
 
-
         if (ws) ws.close();
         ws = new WebSocket("ws://127.0.0.1:6942");
 
