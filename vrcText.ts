@@ -17,7 +17,7 @@ type MessageDraft = {
 
 interface BridgeMsg {
     content: string,
-    immediate: boolean,
+    sendNow: boolean,
     popNoise: boolean;
 }
 
@@ -36,7 +36,6 @@ const plugin = definePlugin({
     }),
     toolboxActions: {
         "Clear Chatbox": () => {
-            sendTyping(false);
             sendWsMessage("", false);
             showToast("Chatbox cleared!");
         },
@@ -48,8 +47,10 @@ const plugin = definePlugin({
     },
     flux: {
         DRAFT_CHANGE(d: MessageDraft) {
-            if (!d.draft.startsWith("==") || !d.draft.startsWith("==/")) return;
-            sendTyping(false);
+            if (ws.readyState === WebSocket.CLOSED) return;
+            if (d.draft.startsWith("==")) {
+                sendTyping(true);
+            }
         }
     },
 
@@ -86,24 +87,38 @@ const plugin = definePlugin({
             this.stop();
             return;
         }
-        let content = msg.content.replace(/^==\/?/, '');
+        let content = msg.content.replace("==", '').replace("=/=", '');
         let trim = msg.content.trim();
+
         if (this.settings.store.override) {
             if (trim.startsWith("==")) {
                 msg.content = content;
                 return;
             }
+
+            sendTyping(false);
             sendWsMessage(content);
             msg.content = ""; // hack to make it not send lol
             return;
-        } else if (trim.startsWith("==")) {
-            let silent = trim.startsWith("==/");
-            sendWsMessage(content, silent);
+        }
+
+        if (trim.startsWith("==")) {
+            sendTyping(false);
+            sendWsMessage(content);
             msg.content = "";
+            return;
+        }
+
+        if (trim.startsWith("=/=")) { // silent message, no pop sound
+            sendTyping(false);
+            sendWsMessage(content, false);
+            msg.content = "";
+            return;
         }
     },
 
     stop() {
+        unregisterCommand("connect");
         removePreSendListener(this.preSend);
     },
 
@@ -144,24 +159,21 @@ function showToast(msg: string) {
     });
 }
 
+// https://docs.vrchat.com/docs/osc-as-input-controller
+
 function sendWsMessage(msg: string, pop = true, now = true) {
     let bridgeMsg: BridgeMsg = {
         content: msg,
-        immediate: now,
+        sendNow: now,
         popNoise: pop
     };
     ws.send(JSON.stringify(bridgeMsg));
     sendTyping(false);
 }
 
-let lastTyping = 0;
 
 function sendTyping(isTyping: boolean) {
-    const now = Date.now();
-    if (isTyping && now - lastTyping < 3000) return;
-
     ws.send(isTyping ? "typing:true" : "typing:false");
-    lastTyping = now;
 }
 
 export default plugin;
