@@ -21,16 +21,25 @@ interface BridgeMsg {
     popNoise: boolean;
 }
 
+let lastSend = 0;
+
 const plugin = definePlugin({
     name: "guinea pig bridge",
     description: "Discord => VRC text bridge.",
     authors: [Devs.Animal],
+    tags: ["vrcText"],
     dependencies: ["CommandsAPI", "MessageEventsAPI"],
     settings: definePluginSettings({
         override: {
             description: "Inverted behavior: Send all messages to bridge (overridden with prefix)",
             type: OptionType.BOOLEAN,
             default: false,
+            restartNeeded: false,
+        },
+        pTyping: {
+            description: "Send messages as you're typing",
+            type: OptionType.BOOLEAN,
+            default: true,
             restartNeeded: false,
         }
     }),
@@ -48,8 +57,15 @@ const plugin = definePlugin({
     flux: {
         DRAFT_CHANGE(d: MessageDraft) {
             if (ws.readyState === WebSocket.CLOSED) return;
-            if (d.draft.startsWith("==")) {
+            if (plugin.settings.store.override) {
                 sendTyping(true);
+            } else if (d.draft.startsWith("==") && d.draft.length > 2) {
+                sendTyping(true);
+                plugin.handleProceduralMessage(d.draft);
+            }
+            if (d.draft == "-=") {
+                sendWsMessage("", false);
+                showToast("Chatbox cleared!");
             }
         }
     },
@@ -74,12 +90,21 @@ const plugin = definePlugin({
             showToast("Connected to OSC bridge");
         };
 
-        registerCommand(connect, "vrcText");
+        registerCommand(connect, "VRCText");
 
         const connectionSuccessful = await new Promise(res => setTimeout(() => res(ws.readyState === WebSocket.OPEN), 1000)); // check if open after 1s
         if (!connectionSuccessful) return;
 
         this.preSend = addPreSendListener((_, msg) => this.onSend(msg));
+    },
+
+    handleProceduralMessage(msg: string) {
+        if (!plugin.settings.store.pTyping) return;
+        const content = msg.replace("==", '').replace("=/=", '').trim();
+        if (Date.now() - lastSend > 980) {
+            sendWsMessage(content, false);
+            lastSend = Date.now();
+        }
     },
 
     onSend(msg: MessageObject) {
@@ -96,21 +121,18 @@ const plugin = definePlugin({
                 return;
             }
 
-            sendTyping(false);
             sendWsMessage(content);
             msg.content = ""; // hack to make it not send lol
             return;
         }
 
         if (trim.startsWith("==")) {
-            sendTyping(false);
             sendWsMessage(content);
             msg.content = "";
             return;
         }
 
         if (trim.startsWith("=/=")) { // silent message, no pop sound
-            sendTyping(false);
             sendWsMessage(content, false);
             msg.content = "";
             return;
@@ -168,7 +190,6 @@ function sendWsMessage(msg: string, pop = true, now = true) {
         popNoise: pop
     };
     ws.send(JSON.stringify(bridgeMsg));
-    sendTyping(false);
 }
 
 
