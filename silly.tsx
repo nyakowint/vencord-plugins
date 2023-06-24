@@ -116,7 +116,7 @@ function setActivity(activity: Activity | undefined) {
 
 const settings = definePluginSettings({
     showButtons: {
-        description: "Show watch and channel buttons",
+        description: "Show buttons",
         type: OptionType.BOOLEAN,
         default: false,
     },
@@ -157,9 +157,9 @@ const settings = definePluginSettings({
 const shig = definePlugin({
     name: "vcMiD",
     tags: ["presence", "premid", "rpc"],
-    description: "Lightweight PreMiD(eez nuts) receiver. Supports watching/listening status. Requires a bridge script because of how Vencord works. If youre lazy or dont care just use their app lmao",
+    description: "An overengineered PreMiD app replacement. Supports watching/listening status. Requires extra setup (see about)",
     authors: [Devs.Animal],
-    version: "1.1.0",
+    version: "1.2.0",
     toolboxActions: {
         "Reconnect PreMiD": () => {
             isReconnecting = true;
@@ -178,7 +178,9 @@ const shig = definePlugin({
             <Forms.FormTitle tag="h3">How to use this plugin</Forms.FormTitle>
             <Forms.FormText>
                 - Install the <Link href="https://premid.app/downloads#ext-downloads">PreMiD browser extension</Link>
+
                 - Download the bridge script (link soon) - this is needed because of how Vencord works (built in plugins + no node stuff)
+
                 That is all you need, this plugin+bridge replicates their electron tray process so no need to download that.
             </Forms.FormText>
         </>
@@ -259,7 +261,6 @@ const shig = definePlugin({
         });
     },
 
-    // i love how i gave up and just c+p'd customrpc but it was really just discord playing me
     async getActivity(pmActivity: Activity): Promise<Activity | undefined> {
         const appInfo = await getApp(pmActivity.application_id);
         // debugLog(JSON.parse(JSON.stringify(act)));
@@ -302,15 +303,26 @@ const shig = definePlugin({
             }
         }
 
+        // horror
         if (pmActivity.timestamps) {
-            activity.timestamps = {
-                ...pmActivity.timestamps
-            };
-            if (pmActivity.timestamps && pmActivity.timestamps.end) {
-                activity.assets.large_text = `${formatTime(pmActivity.timestamps.end - Math.floor(Date.now() / 1000))} left`;
-            }
-            if (pmActivity.timestamps && pmActivity.timestamps.start) {
-                activity.assets.large_text = `${formatTime(Math.floor(Date.now() / 1000) - pmActivity.timestamps.start)} elapsed`;
+            let { start, end } = pmActivity.timestamps;
+            if (start && end) {
+                activity.timestamps = pmActivity.timestamps;
+            } else if (start) {
+                if (activity.type == ActivityType.WATCHING) {
+                    activity.assets.large_text = `${formatTime(Math.floor(Date.now() / 1000) - start)} elapsed`;
+                }
+                activity.timestamps = {
+                    start: start
+                };
+            } else if (end) {
+                if (activity.type == ActivityType.WATCHING) {
+                    activity.assets.large_text = `${formatTime(end - Math.floor(Date.now() / 1000))} left`;
+                }
+                activity.timestamps = {
+                    ...activity.timestamps,
+                    end: end
+                };
             }
         }
 
