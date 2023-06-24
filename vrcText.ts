@@ -40,32 +40,33 @@ const plugin = definePlugin({
             description: "Send messages as you're typing",
             type: OptionType.BOOLEAN,
             default: true,
-            restartNeeded: false,
+            restartNeeded: false
         }
     }),
     toolboxActions: {
         "Clear Chatbox": () => {
-            sendWsMessage("", false);
-            showToast("Chatbox cleared!");
+            plugin.clearChatbox();
         },
         "Connect": () => {
             plugin.stop();
             plugin.start();
-            return;
         }
+    },
+    clearChatbox() {
+        sendWsMessage("", false);
+        showToast("Chatbox cleared!");
     },
     flux: {
         DRAFT_CHANGE(d: MessageDraft) {
             if (ws.readyState === WebSocket.CLOSED) return;
             if (plugin.settings.store.override) {
                 sendTyping(true);
-            } else if (d.draft.startsWith("==") && d.draft.length > 2) {
+            } else if (d.draft.startsWith("==") && d.draft.length > 3) {
                 sendTyping(true);
                 plugin.handleProceduralMessage(d.draft);
             }
             if (d.draft == "-=") {
-                sendWsMessage("", false);
-                showToast("Chatbox cleared!");
+                plugin.clearChatbox();
             }
         }
     },
@@ -101,7 +102,7 @@ const plugin = definePlugin({
     handleProceduralMessage(msg: string) {
         if (!plugin.settings.store.pTyping) return;
         const content = msg.replace("==", '').replace("=/=", '').trim();
-        if (Date.now() - lastSend > 980) {
+        if (Date.now() - lastSend > 1050) {
             sendWsMessage(content, false);
             lastSend = Date.now();
         }
