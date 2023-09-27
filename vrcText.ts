@@ -5,6 +5,7 @@ import { Toasts } from "@webpack/common";
 import { addPreSendListener, MessageObject, removePreSendListener } from "@api/MessageEvents";
 import { definePluginSettings } from "@api/Settings";
 import { FluxEvents } from "@webpack/types";
+import { getCurrentChannel } from "@utils/discord";
 
 let ws: WebSocket;
 
@@ -109,7 +110,14 @@ const plugin = definePlugin({
     },
 
     onSend(msg: MessageObject) {
+
         if (ws.readyState === WebSocket.CLOSED) {
+            if (msg.content.startsWith("==") || msg.content.startsWith("=/=")) {
+                sendBotMessage(getCurrentChannel().id, {
+                    content: "bridge is not connected!!",
+                });
+                msg.content = "";
+            }
             this.stop();
             return;
         }
