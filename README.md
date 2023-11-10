@@ -1,3 +1,3 @@
 # vencord-plugins
 DO NOT USE THESE LMAO
-I take no responsibility if you explode from using my plugins lol
+they are not finished or very trash. good ones are in third party plugins channel of vencord
