@@ -40,7 +40,7 @@ const messageFetchQueue = new Queue();
 export default definePlugin({
     name: "ReactionNotifier",
     description: "Notifies you when someone reacts to your message",
-    authors: [Devs.Animal],
+    authors: [Devs.Nyako],
     settings,
 
 

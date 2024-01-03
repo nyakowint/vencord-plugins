@@ -183,7 +183,7 @@ const logger = new Logger("notes", "#90aee5");
 export default definePlugin({
     name: "MessageNotes",
     description: "Save messages to a notebook for easy access",
-    authors: [Devs.Animal],
+    authors: [Devs.Nyako],
     dependencies: ["MessagePopoverAPI", "ServerListAPI"],
 
     start() {
